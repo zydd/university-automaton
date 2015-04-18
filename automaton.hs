@@ -20,15 +20,16 @@ closure a ss = _closure a [] ss
                     third (_, _, s1) = s1
 
 delta :: Automaton -> [State] -> Char -> [State]
-delta a [] c = []
-delta a s '\\' = closure a s
-delta a (s:ss) c = closure a (delta_s ++ (delta a ss c))
-    where delta_s = map third $ filter match $ transitions a
-          match (s1, c1, _) = s == s1 && c == c1
-          third (_, _, s1) = s1
+delta a s c = _delta a (closure a s) c
+    where _delta a [] c = []
+          _delta a s '\\' = closure a s
+          _delta a (s:ss) c = closure a (delta_s ++ (delta a ss c))
+              where delta_s = map third $ filter match $ transitions a
+                    match (s1, c1, _) = s == s1 && c == c1
+                    third (_, _, s1) = s1
 
 process :: Automaton -> String -> Bool
-process a str = _process a (closure a $ start a) str
+process a str = _process a (start a) str
     where _process _ [] _ = False
           _process a ss [] = not $ null $ intersect ss (final a)
           _process a ss (c:cs) = _process a (delta a ss c) cs
@@ -50,14 +51,16 @@ genGraphViz a = "digraph fsm {\n" ++
                              in concat $ map genTransition (transitions a)
 
 
-toAfd :: Automaton -> Automaton
-toAfd a = Automaton [] (alphabet a) (trans $ start a) [] []
-    where trans s = map (\(s0, c, s1) -> (s0, c, concat $ sort s1)) $ deltas (closure a s) (alphabet a)
-          deltas _ [] = []
-          deltas [] _ = []
-          deltas s (c:cs) = (concat $ sort s, c, delta a s c) : (deltas s cs)
+-- toAfd :: Automaton -> Automaton
+-- toAfd a = Automaton [] (alphabet a) (trans $ closure a $ start a) [] []
+toAfd a = trans $ start a
+    where trans s = deltas s (alphabet a)
+          deltas _ [] _ = []
+          deltas [] _ _ = []
+          deltas s (c:cs) ex = let delta_c = delta a s c
+                               in if null delta_c then (deltas s cs ex) else (concat $ sort s, c, delta_c) : (deltas s cs ex)
           third (_, _, s) = s
-
+-- map (\(s0, c, s1) -> (s0, c, concat $ sort s1))
 
 p0i1 = Automaton {states = ["A", "B", "C", "D"],
                   alphabet = ['0', '1'],
@@ -106,4 +109,4 @@ afn = Automaton {states = ["A", "B", "C", "D", "E"],
 --     system "dot -Tsvg -O automaton.dot"
 --     return ()
 
-main = putStrLn $ show $ transitions $ toAfd afn
+main = putStrLn $ show $ toAfd afn
